@@ -1,4 +1,4 @@
-from math import cos, sin, sqrt, pi, tan
+from math import cos, sin, sqrt, pi
 
 import numpy as np
 
@@ -176,12 +176,12 @@ def get_cell_fragments_coordinates(cell_size, i, j):
     return coordinates
 
 
-def get_scans(x_robot, y_robot, local_map, alpha_diff=90, cell_size=1):
+def generate_scans(x_robot, y_robot, local_map, alpha_diff=90, cell_size=1):
     scan = {}
     for alpha in range(0, 360, alpha_diff):
         if not alpha % 90:
 
-            _, x_array, y_array = get_params_occupied_cell(int(x_robot), int(y_robot), alpha, local_map.map)
+            _, x_array, y_array = get_params_occupied_cell(int(x_robot), int(y_robot), alpha, local_map.array)
             k_robot, b_robot = get_line_coefficients(alpha=alpha, x=x_robot, y=y_robot)
             coordinates = get_cell_fragments_coordinates(cell_size, x_array, y_array)
             crossing_points = get_crossing_points(k_robot, b_robot, coordinates, x_robot, y_robot)
@@ -197,3 +197,5 @@ def get_scans(x_robot, y_robot, local_map, alpha_diff=90, cell_size=1):
                 print('Failed! Угол:', alpha, '\nx:', x_robot, 'y:', y_robot)
                 print(e)
     return scan
+
+

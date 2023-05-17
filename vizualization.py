@@ -2,7 +2,6 @@ import logging
 import math
 import tkinter as tk
 
-
 ray_statuses = {True: 'Убрать лучи', False: 'Показать лучи'}
 orient_statuses = {True: 'Убрать ориентацию в пространстве', False: 'Показать ориентацию в пространстве'}
 
@@ -51,7 +50,10 @@ class Window:
                     color = "black"
                 else:
                     color = "white"
-                self.canvas.create_rectangle(x * self.cell_size + self.padding + label_size, y * self.cell_size + self.padding, (x + 1) * self.cell_size + self.padding + label_size, (y + 1) * self.cell_size + self.padding,
+                self.canvas.create_rectangle(x * self.cell_size + self.padding + label_size,
+                                             y * self.cell_size + self.padding,
+                                             (x + 1) * self.cell_size + self.padding + label_size,
+                                             (y + 1) * self.cell_size + self.padding,
                                              fill=color)
 
     def __create_grid_frame(self, local_map, width_grid, height_grid):
@@ -67,7 +69,7 @@ class Window:
                                    y_coordinate + self.padding)
 
         for i in range(size):
-            x_coordinate = self.cell_size * i + self.cell_size // 2  + self.padding
+            x_coordinate = self.cell_size * i + self.cell_size // 2 + self.padding
             self.__draw_axis_label(str(i), label_size, x_coordinate, size * self.cell_size + self.padding + label_size)
 
     def __draw_axis_label(self, text, size, x, y):
@@ -78,7 +80,7 @@ class Window:
         self.button_next = tk.Button(self.top_control_frame, text="Следующая позиция", bg="white", wraplength=180)
         self.button_show_rays = tk.Button(self.top_control_frame, text="Убрать лучи", bg="white", wraplength=180)
         self.button_show_normal = tk.Button(self.top_control_frame, text="Убрать ориентацию в пространстве", bg="white",
-                                       wraplength=180)
+                                            wraplength=180)
 
         self.button_next.pack(side=tk.TOP, pady=10)
         self.button_show_rays.pack(side=tk.TOP, pady=10)
@@ -105,8 +107,8 @@ class Window:
         scrollbar = tk.Scrollbar(self.bottom_control_frame)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.log_text = tk.Text(self.bottom_control_frame,
-                           width=width_control,
-                           yscrollcommand=scrollbar.set)
+                                width=width_control,
+                                yscrollcommand=scrollbar.set)
         self.log_text.pack(fill=tk.BOTH, expand=1)
         scrollbar.config(command=self.log_text.yview)
         self.logger = logging.getLogger()
@@ -115,15 +117,14 @@ class Window:
         handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
         self.logger.addHandler(handler)
 
-    def on_next_robots_button_click(self, window, scans, positions, robot_viz):
-        robot_viz.clear_robots(window)
+    def on_next_robots_button_click(self, scans, positions, robot_viz):
+        robot_viz.clear_robots(self)
         x, y, orientation = next(positions)
         scan = next(scans)
         RobotsVis.current_scan = scan
-        robot = Robot(self.canvas, x, y, orientation, scan)
+        robot = Robot(self, x, y, orientation, scan)
         robot_viz.add_robot(robot)
-        self.logger.info('New position: {}, {}, {}'.format(x, y, orientation))
-        self.logger.info('New scan: {}'.format(scan))
+        self.logger.info('New position: {}'.format(robot))
 
     def on_show_rays_button_click(self, robot_viz):
         robot_viz.change_ray_status()
@@ -131,10 +132,10 @@ class Window:
         self.button_show_rays.config(text=ray_statuses[status])
         if status:
             for robot in robot_viz.robots:
-                robot.show_rays()
+                robot.show_rays(self)
         else:
             for robot in robot_viz.robots:
-                robot.hide_rays()
+                robot.hide_rays(self)
 
     def on_show_normal_button_click(self, robot_viz):
         robot_viz.change_orient_status()
@@ -142,10 +143,20 @@ class Window:
         self.button_show_normal.config(text=orient_statuses[status])
         if status:
             for robot in robot_viz.robots:
-                robot.show_orientation()
+                robot.show_orientation(self)
         else:
             for robot in robot_viz.robots:
-                robot.hide_orientation()
+                robot.hide_orientation(self)
+
+    def add_buttons(self, scans_generator, positions_generator, robot_viz):
+        self.button_next.config(
+            command=lambda: self.on_next_robots_button_click(scans_generator,
+                                                             positions_generator,
+                                                             robot_viz))
+        self.button_show_rays.config(command=lambda:
+                self.on_show_rays_button_click(robot_viz))
+        self.button_show_normal.config(command=lambda:
+                self.on_show_normal_button_click(robot_viz))
 
 
 class TextHandler(logging.Handler):
@@ -176,7 +187,10 @@ class Robot:
         self.orientation = orientation
         self.rays = []
         self.__create_robot(window, scan)
-        window.logger.info("Create robot x: {}, y: {}, orient: {}".format(self.x, self.y, self.orientation))
+        window.logger.info("Create robot {}".format(self))
+
+    def __str__(self):
+        return 'x: {}, y: {}, angle: {}'.format(self.x, self.y, self.orientation)
 
     def __create_robot(self, window, scan):
         self.circle_coords = (
@@ -184,16 +198,20 @@ class Robot:
             self.y * window.cell_size + window.padding)
 
         self.circle = window.canvas.create_oval(self.circle_coords[0] - window.cell_size // 4,
-                                              self.circle_coords[1] - window.cell_size // 4,
-                                              self.circle_coords[0] + window.cell_size // 4,
-                                              self.circle_coords[1] + window.cell_size // 4,
-                                              fill='red', outline='black')
-        if RobotsVis.orient_status:
-            self.draw_orientation(window)
-        if RobotsVis.ray_status:
-            self.draw_rays(window, scan)
+                                                self.circle_coords[1] - window.cell_size // 4,
+                                                self.circle_coords[0] + window.cell_size // 4,
+                                                self.circle_coords[1] + window.cell_size // 4,
+                                                fill='red', outline='black')
 
-    def convert_to_map_coords(self, window, x, y):
+        self.draw_orientation(window)
+        self.draw_rays(window, scan)
+        if not RobotsVis.orient_status:
+            self.hide_orientation(window)
+        if not RobotsVis.ray_status:
+            self.hide_rays(window)
+
+    @staticmethod
+    def convert_to_map_coords(window, x, y):
         return x * window.cell_size + window.padding, y * window.cell_size + window.padding
 
     def draw_rays(self, window, scan):
@@ -254,7 +272,7 @@ class Robot:
 
     @staticmethod
     def calculate_line_orientation_coords(orientation, cell_size, circle_coords):
-        rad = math.radians(orientation-90)
+        rad = math.radians(orientation - 90)
         line_length = cell_size // 2
 
         x_start, y_start = circle_coords
@@ -264,7 +282,8 @@ class Robot:
 
         angle_text_x, angle_text_y = x_start + 4, y_start - line_length // 2
 
-        return (x_start, y_start, x_orientation, y_orientation), (x_start, y_start, x_dashed, y_start), (angle_text_x, angle_text_y)
+        return (x_start, y_start, x_orientation, y_orientation), (x_start, y_start, x_dashed, y_start), (
+        angle_text_x, angle_text_y)
 
 
 class RobotsVis:
@@ -294,7 +313,6 @@ class RobotsVis:
         for robot in self.robots:
             robot.delete_robot(window)
         self.robots = []
-
 
 # def get_simple_map():
 #     return np.asarray([
