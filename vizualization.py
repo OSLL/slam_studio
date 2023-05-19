@@ -1,16 +1,25 @@
-import logging
 import math
+import queue
 import tkinter as tk
+import threading
+from logger import Logger
+from sh import tail
+from config import get_filename
+
 
 ray_statuses = {True: 'Убрать лучи', False: 'Показать лучи'}
 orient_statuses = {True: 'Убрать ориентацию в пространстве', False: 'Показать ориентацию в пространстве'}
 
 
 class Window:
+
     def __init__(self, local_map, name='Карта', padding=20):
         self.window = tk.Tk()
         self.window.configure(bg='white')
         self.window.title(name)
+
+        self.logger = Logger.get_instance()
+
         self.padding = padding
 
         screen_width = self.window.winfo_screenwidth()
@@ -38,6 +47,8 @@ class Window:
         self.window.update_idletasks()
         self.window.grid_columnconfigure(0, weight=0)
         self.window.grid_columnconfigure(1, weight=1)
+
+        self.logger.info('Application starts')
 
     def run(self):
         self.window.mainloop()
@@ -111,11 +122,12 @@ class Window:
                                 yscrollcommand=scrollbar.set)
         self.log_text.pack(fill=tk.BOTH, expand=1)
         scrollbar.config(command=self.log_text.yview)
-        self.logger = logging.getLogger()
-        self.logger.setLevel(logging.DEBUG)
-        handler = TextHandler(self.log_text)
-        handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-        self.logger.addHandler(handler)
+
+        self.log_lines = queue.Queue()
+        self.thread = threading.Thread(target=self.__update_log_widget)
+        self.thread.daemon = True
+        self.thread.start()
+        self.__log_bind()
 
     def on_next_robots_button_click(self, scans, positions, robot_viz):
         robot_viz.clear_robots(self)
@@ -124,7 +136,6 @@ class Window:
         RobotsVis.current_scan = scan
         robot = Robot(self, x, y, orientation, scan)
         robot_viz.add_robot(robot)
-        self.logger.info('New position: {}'.format(robot))
 
     def on_show_rays_button_click(self, robot_viz):
         robot_viz.change_ray_status()
@@ -158,25 +169,28 @@ class Window:
         self.button_show_normal.config(command=lambda:
                 self.on_show_normal_button_click(robot_viz))
 
+    def log_widget_config(self):
+        self.log_text.config(state='disabled')
+        self.log_text.tag_config("INFO", foreground="black")
+        self.log_text.tag_config("DEBUG", foreground="grey")
+        self.log_text.tag_config("WARNING", foreground="orange")
+        self.log_text.tag_config("ERROR", foreground="red")
+        self.log_text.tag_config("CRITICAL", foreground="red", underline=1)
 
-class TextHandler(logging.Handler):
-    def __init__(self, text_widget):
-        super().__init__()
-        self.text_widget = text_widget
-        self.text_widget.config(state='disabled')
-        self.text_widget.tag_config("INFO", foreground="black")
-        self.text_widget.tag_config("DEBUG", foreground="grey")
-        self.text_widget.tag_config("WARNING", foreground="orange")
-        self.text_widget.tag_config("ERROR", foreground="red")
-        self.text_widget.tag_config("CRITICAL", foreground="red", underline=1)
+    def __update_log_widget(self):
+        filename = get_filename()
+        for line in tail("-F", " -c 1", filename, _iter=True):
+            self.log_lines.put(line)
+            self.window.event_generate('<<LogUpdate>>')
 
-    def emit(self, record):
-        msg = self.format(record)
-        base_msg = f"{record.levelname}: {msg}\n"
-        self.text_widget.config(state='normal')
-        self.text_widget.insert(tk.END, base_msg, record.levelname)
-        self.text_widget.see(tk.END)
-        self.text_widget.config(state='disabled')
+    def __update_log(self):
+        self.log_text.config(state='normal')
+        self.log_text.insert(tk.END, self.log_lines.get())
+        self.log_text.see(tk.END)
+        self.log_text.config(state='disabled')
+
+    def __log_bind(self):
+        self.window.bind('<<LogUpdate>>', lambda e: self.__update_log())
 
 
 class Robot:
@@ -187,7 +201,9 @@ class Robot:
         self.orientation = orientation
         self.rays = []
         self.__create_robot(window, scan)
-        window.logger.info("Create robot {}".format(self))
+        self.logger = Logger.get_instance()
+        self.logger.info("New robot position {}".format(self))
+        print("New robot position {}".format(self))
 
     def __str__(self):
         return 'x: {}, y: {}, angle: {}'.format(self.x, self.y, self.orientation)
@@ -314,14 +330,3 @@ class RobotsVis:
             robot.delete_robot(window)
         self.robots = []
 
-# def get_simple_map():
-#     return np.asarray([
-#         [1, 0, 0, 0, 0],
-#         [1, 0, 0, 1, 0],
-#         [1, 0, 0, 0, 0],
-#         [0, 0, 0, 0, 0],
-#         [0, 0, 0, 1, 1]])
-# w = Window(get_simple_map())
-# w.logger.info('создали карту')
-# w.logger.error('error')
-# w.run()
