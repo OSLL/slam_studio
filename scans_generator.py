@@ -1,5 +1,4 @@
 from math import cos, sin, sqrt, pi
-
 import numpy as np
 
 
@@ -176,7 +175,7 @@ def get_cell_fragments_coordinates(cell_size, i, j):
     return coordinates
 
 
-def generate_scans(x_robot, y_robot, local_map, alpha_diff=90, cell_size=1):
+def generate(x_robot, y_robot, local_map, alpha_diff=90, cell_size=1):
     scan = {}
     for alpha in range(0, 360, alpha_diff):
         if not alpha % 90:

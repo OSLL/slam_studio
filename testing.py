@@ -1,18 +1,19 @@
-from data import get_iterator
-from generator import generate_scans
+from scans_generator import generate
 from map_model import Map
 from vizualization import Robot, RobotsVis, Window
-from data import get_iterator
+from data_utils import get_iterator
 
 
 def main():
-    local_map = Map(debug=False, density=0.61)
+
+    local_map = Map(debug=True, density=0.55)
     robot_viz = RobotsVis()
     window = Window(local_map.array)
     positions = local_map.get_free_positions()
     scans = []
     for x_robot, y_robot, orientation in positions:
-        scans.append(generate_scans(x_robot, y_robot, local_map, alpha_diff=10))
+        scans.append(generate(x_robot, y_robot, local_map, alpha_diff=10))
+    print(scans)
     scan_it = get_iterator(scans)
     scan = next(scan_it)
 

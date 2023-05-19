@@ -57,7 +57,8 @@ class Map:
                 walls.append((x+1, y, x+1, y + self.cell_size))
         return walls
 
-    def get_obstacle_boundaries_in_real_world(self, x, y):
+    @staticmethod
+    def get_obstacle_boundaries_in_real_world(x, y):
         return [(x, y, x + 1, y), (x + 1, y, x + 1, y + 1),
                 (x, y, x, y + 1), (x, y + 1, x + 1, y + 1)]
 
